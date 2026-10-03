@@ -1,26 +1,27 @@
-# Windows Data Recovery Suite
+﻿# Windows Data Recovery Suite
 
-Professional, privacy-first Windows data recovery utility for recovering accidentally deleted files (including Shift+Delete and emptied Recycle Bin) from NTFS volumes when the underlying data remains recoverable.
+![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue)
+![Language](https://img.shields.io/badge/language-Rust%20%7C%20TypeScript-orange)
+![License](https://img.shields.io/badge/license-Proprietary-red)
 
-**Core promise:** Recover your own deleted files when the storage has not been overwritten.
+A professional, privacy-first Windows data recovery utility designed for recovering accidentally deleted files (including Shift+Delete and emptied Recycle Bin) from NTFS volumes. 
 
-Recovery is **never guaranteed**. Success depends on overwrite status, fragmentation, SSD TRIM behavior, filesystem condition, and other factors.
+**Core Promise:** Recover your own deleted files when the storage has not been overwritten. *Note: Recovery is never guaranteed. Success depends on overwrite status, fragmentation, SSD TRIM behavior, filesystem condition, and other factors.*
 
-## Priority Order
+---
 
-1. Correctness  
-2. Data safety (read-only source scanning)  
-3. Read-only source-disk behavior  
-4. Recovery reliability  
-5. Performance  
-6. Clear UX  
-7. Maintainability  
-8. Security  
-9. Extensibility  
+## 🛡️ Core Principles & Safety Rules
 
-## Architecture Overview
+1. **Read-Only Scanning:** The scanning engine **never** writes to the source device.
+2. **Safe Recovery:** Recovered files are never written back to the source drive by default. Attempting to do so triggers a strong warning.
+3. **No Execution:** No automatic execution of recovered files to prevent malware execution.
+4. **Privacy First:** 100% offline. No telemetry of recovered content and no cloud upload.
 
-```
+## 🏗️ Architecture
+
+The suite is built with a reliable Rust core and a modern web frontend via Tauri.
+
+`	ext
 ┌──────────────────────────────────────────┐
 │              Tauri + React UI            │
 │        TypeScript + modern frontend      │
@@ -44,86 +45,74 @@ Recovery is **never guaranteed**. Success depends on overwrite status, fragmenta
 │           Windows Storage Layer          │
 │      Safe / raw / read-only disk access  │
 └──────────────────────────────────────────┘
-```
+`
 
-- **Rust** recovery engine (independently testable)
-- **Tauri** desktop shell
-- **React + TypeScript** UI
-- Source disk access is **read-only by design**
+## 🚀 Getting Started
 
-## Supported Platforms (V1)
+### Prerequisites
+- Windows 10 or 11 (64-bit)
+- [Rust Toolchain](https://rustup.rs/) (latest stable)
+- [Node.js](https://nodejs.org/) (v16+)
+- Cargo & npm
 
-- Windows 10 / 11 (64-bit)
-- Filesystem priority: **NTFS** first
+### Building the Project
 
-## Safety Rules
+The workspace includes the CLI engine and the Desktop UI.
 
-- Scanning never writes to the source device
-- Recovered files are never written to the source drive by default
-- Same-physical-disk destination triggers a strong warning / confirmation
-- No automatic execution of recovered files
-- No telemetry of recovered content
-- No cloud upload
+**Core Engine (Rust):**
+`ash
+# Build the Rust workspace
+cargo build --release
+`
 
-## Development Status
+**Desktop UI (Tauri + React):**
+`ash
+cd apps/desktop
+npm install
+npm run tauri build
+`
 
-See `docs/architecture/` and `AGENTS.md`.
+## 💻 Usage
+
+### Command Line Interface (CLI)
+You can run the recovery engine directly from the CLI. This is useful for testing and scripting.
+
+`ash
+# Scan a disk image or physical drive
+cargo run -p recover-cli -- scan tests/fixtures/synthetic_ntfs.img --max-records 16
+
+# Recover files to an output directory
+cargo run -p recover-cli -- recover tests/fixtures/synthetic_ntfs.img --output /tmp/out --max-records 16
+`
+
+### Desktop UI
+To run the graphical interface in development mode:
+
+`ash
+cd apps/desktop
+npm run tauri dev
+`
+
+*Screens include:* Home (drive selection) → Scan Mode → Progress → Results → Recover → Report.
+
+## 🧪 Testing
+
+The test suite includes controlled recovery fixtures under 	ests/fixtures/. Run the full test suite with:
+
+`ash
+cargo test --workspace
+`
+
+### Verified Vertical Slice
+On the synthetic NTFS test image (	ests/fixtures/synthetic_ntfs.img), exact SHA-256 recovery is verified for:
+- 
+otes.txt (resident deleted file)
+- payload.bin (non-resident data runs)
+
+## 📈 Development Status
 
 Current milestone focus: **Phase 1 — NTFS Read-Only Scanner + Recovery vertical slice**.
+See docs/architecture/ for detailed phase planning.
 
-## Building
-
-```bash
-# Workspace
-cargo build
-
-# Desktop (when Tauri app is fully scaffolded)
-cd apps/desktop
-npm install
-npm run tauri dev
-```
-
-## Testing
-
-```bash
-cargo test --workspace
-```
-
-Controlled recovery fixtures live under `tests/fixtures/`.
-
-## License
-
-Proprietary / TBD. Intended for legitimate recovery of data the user is authorized to access.
-
-
-## CLI (engine)
-
-```bash
-cargo run -p recover-cli -- scan tests/fixtures/synthetic_ntfs.img --max-records 16
-cargo run -p recover-cli -- recover tests/fixtures/synthetic_ntfs.img --output /tmp/out --max-records 16
-```
-
-Exact SHA-256 recovery is verified against `tests/fixtures/synthetic_ntfs.json`.
-
-## Desktop UI (Tauri + React)
-
-```bash
-cd apps/desktop
-npm install
-npm run tauri dev
-```
-
-Screens: Home (drives / open image) → Scan mode → Progress → Results → Recover → Report.
-
-IPC commands: `list_drives`, `open_image`, `start_scan`, `cancel_scan`, `get_candidates`, `recover_files`.
-
-Deep / Advanced scan modes are explicitly marked **NOT IMPLEMENTED**.
-
-## Verified vertical slice
-
-On the synthetic NTFS image:
-
-| File | Kind | Result |
-|------|------|--------|
-| notes.txt | resident deleted | exact SHA-256 |
-| payload.bin | non-resident data runs | exact SHA-256 |
+## 📄 License
+Proprietary / TBD. Intended solely for legitimate recovery of data the user is authorized to access.
