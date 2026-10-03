@@ -66,6 +66,14 @@ pub struct ScanProgress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryProgress {
+    pub files_processed: usize,
+    pub total_files: usize,
+    pub successful: usize,
+    pub failed: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryRequest {
     pub candidate_ids: Vec<String>,
     pub destination_path: String,

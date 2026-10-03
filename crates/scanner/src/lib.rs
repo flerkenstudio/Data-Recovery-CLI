@@ -229,19 +229,33 @@ pub fn quick_scan_ntfs(
                 Err(_) => continue,
             };
 
-            if record.is_directory {
-                for attr in &record.attributes {
-                    if let ParsedAttribute::FileName(fn_attr) = attr {
-                        if fn_attr.namespace != 2 {
-                            dir_map.insert(rec_idx, (fn_attr.name.clone(), fn_attr.parent_mft_ref));
-                            break;
+            let mut is_directory = record.is_directory;
+            let mut best_name = None;
+
+            for attr in &record.attributes {
+                match attr {
+                    ParsedAttribute::Other { attr_type } => {
+                        if *attr_type == 0x90 || *attr_type == 0xA0 {
+                            is_directory = true;
                         }
                     }
+                    ParsedAttribute::FileName(fn_attr) => {
+                        if best_name.is_none() || fn_attr.namespace != 2 {
+                            best_name = Some((fn_attr.name.clone(), fn_attr.parent_mft_ref));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if is_directory {
+                if let Some((name, parent_ref)) = best_name {
+                    dir_map.insert(rec_idx, (name, parent_ref));
                 }
             }
 
             if !record.in_use {
-                if record.is_directory && !options.include_directories {
+                if is_directory && !options.include_directories {
                     continue;
                 }
 
@@ -316,7 +330,7 @@ pub fn quick_scan_ntfs(
                         is_resident,
                         resident_bytes,
                         data_runs,
-                        is_directory: record.is_directory,
+                        is_directory,
                         timestamps,
                     });
                 }

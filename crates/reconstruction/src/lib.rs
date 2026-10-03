@@ -41,12 +41,21 @@ pub fn reconstruct_bytes(
             break;
         }
 
-        let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
-        let run_len_bytes = (run.cluster_count * bytes_per_cluster as u64).min(remaining);
+        let read_len_bytes = run.cluster_count * bytes_per_cluster as u64;
+        let actual_len_bytes = read_len_bytes.min(remaining);
 
-        let chunk = device.read_exact_at(run_offset_bytes, run_len_bytes as usize)?;
-        remaining -= chunk.len() as u64;
-        file_buf.extend_from_slice(&chunk);
+        if run.cluster_offset == u64::MAX {
+            // Sparse run
+            file_buf.resize(file_buf.len() + actual_len_bytes as usize, 0);
+            remaining -= actual_len_bytes;
+        } else {
+            let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
+            let chunk = device.read_exact_at(run_offset_bytes, read_len_bytes as usize)?;
+            let chunk_slice = &chunk[0..actual_len_bytes as usize];
+            
+            remaining -= chunk_slice.len() as u64;
+            file_buf.extend_from_slice(chunk_slice);
+        }
     }
 
     Ok(file_buf)
@@ -83,13 +92,23 @@ pub fn reconstruct_to_file<P: AsRef<Path>>(
             break;
         }
 
-        let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
-        let run_len_bytes = (run.cluster_count * bytes_per_cluster as u64).min(remaining);
+        let read_len_bytes = run.cluster_count * bytes_per_cluster as u64;
+        let actual_len_bytes = read_len_bytes.min(remaining);
 
-        let chunk = device.read_exact_at(run_offset_bytes, run_len_bytes as usize)?;
-        out_file.write_all(&chunk)?;
-        total_written += chunk.len() as u64;
-        remaining -= chunk.len() as u64;
+        if run.cluster_offset == u64::MAX {
+            let zeros = vec![0u8; actual_len_bytes as usize];
+            out_file.write_all(&zeros)?;
+            total_written += actual_len_bytes;
+            remaining -= actual_len_bytes;
+        } else {
+            let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
+            let chunk = device.read_exact_at(run_offset_bytes, read_len_bytes as usize)?;
+            let chunk_slice = &chunk[0..actual_len_bytes as usize];
+            
+            out_file.write_all(chunk_slice)?;
+            total_written += chunk_slice.len() as u64;
+            remaining -= chunk_slice.len() as u64;
+        }
     }
 
     Ok(total_written)

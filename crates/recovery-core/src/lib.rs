@@ -1,5 +1,5 @@
 use filesystem::{
-    CandidateFile, RecoveryReport, SingleFileRecoveryOutcome, ScanProgress,
+    CandidateFile, RecoveryReport, SingleFileRecoveryOutcome, ScanProgress, RecoveryProgress
 };
 use ntfs_parser::BootSector;
 use reconstruction::reconstruct_to_file;
@@ -79,6 +79,7 @@ impl RecoverySession {
         &self,
         candidate_ids: &[String],
         destination_dir: P,
+        mut progress_cb: impl FnMut(RecoveryProgress),
     ) -> Result<RecoveryReport> {
         let dest_dir = destination_dir.as_ref();
         std::fs::create_dir_all(dest_dir)?;
@@ -140,6 +141,13 @@ impl RecoverySession {
                     });
                 }
             }
+
+            progress_cb(RecoveryProgress {
+                files_processed: successful + failed,
+                total_files: candidate_ids.len(),
+                successful,
+                failed,
+            });
         }
 
         Ok(RecoveryReport {

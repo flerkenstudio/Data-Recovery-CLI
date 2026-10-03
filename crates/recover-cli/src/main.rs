@@ -216,7 +216,21 @@ fn main() -> Result<()> {
             }
 
             println!("Recovering {} candidate file(s) to {:?}...", target_ids.len(), output);
-            let report = session.recover_candidates(&target_ids, &output)?;
+            let report = session.recover_candidates(&target_ids, &output, |progress| {
+                if !json {
+                    let spinner = SPINNER_ASCII[(progress.files_processed / 10) % SPINNER_ASCII.len()];
+                    let percentage = (progress.files_processed as f64 / progress.total_files as f64 * 100.0).min(100.0) as u32;
+                    print!(
+                        "\r[{}] Recovered {:>7} / {:>7} files ({:>3}%) | Success: {}, Failed: {}",
+                        spinner, progress.files_processed, progress.total_files, percentage, progress.successful, progress.failed
+                    );
+                    let _ = std::io::stdout().flush();
+                    
+                    if progress.files_processed == progress.total_files {
+                        println!();
+                    }
+                }
+            })?;
 
             if json {
                 let json_output = serde_json::to_string_pretty(&report)?;

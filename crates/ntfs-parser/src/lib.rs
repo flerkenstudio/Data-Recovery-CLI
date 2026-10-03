@@ -127,6 +127,8 @@ pub fn decode_runlist(runlist_bytes: &[u8]) -> Result<Vec<ParsedDataRun>> {
         cursor += len_size;
 
         let mut lcn_delta: i64 = 0;
+        let mut is_sparse = false;
+        
         if offset_size > 0 {
             for i in 0..offset_size {
                 lcn_delta |= (runlist_bytes[cursor + i] as i64) << (i * 8);
@@ -139,10 +141,12 @@ pub fn decode_runlist(runlist_bytes: &[u8]) -> Result<Vec<ParsedDataRun>> {
             }
             cursor += offset_size;
             current_lcn += lcn_delta;
+        } else {
+            is_sparse = true;
         }
 
         runs.push(ParsedDataRun {
-            lcn: current_lcn as u64,
+            lcn: if is_sparse { u64::MAX } else { current_lcn as u64 },
             cluster_count: count,
         });
     }
