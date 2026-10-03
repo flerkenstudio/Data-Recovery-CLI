@@ -102,6 +102,36 @@ impl<'a> MftReader<'a> {
             size: self.total_size,
         }))
     }
+
+    /// Optimized chunk reader: reads a block of N records in a single disk read call.
+    pub fn read_records_chunk(&self, start_record: u64, num_records: usize) -> Result<Vec<u8>> {
+        let chunk_bytes = num_records * self.record_size;
+        let start_offset_in_mft = start_record * self.record_size as u64;
+        let mut current_mft_offset: u64 = 0;
+
+        for run in &self.runs {
+            let run_len_bytes = run.cluster_count * self.bytes_per_cluster as u64;
+            if start_offset_in_mft >= current_mft_offset
+                && start_offset_in_mft + chunk_bytes as u64 <= current_mft_offset + run_len_bytes
+            {
+                let offset_in_run = start_offset_in_mft - current_mft_offset;
+                let disk_offset = (run.lcn * self.bytes_per_cluster as u64) + offset_in_run;
+                return Ok(self.device.read_exact_at(disk_offset, chunk_bytes)?);
+            }
+            current_mft_offset += run_len_bytes;
+        }
+
+        // Fallback if chunk spans across data run boundaries
+        let mut buf = Vec::with_capacity(chunk_bytes);
+        for i in 0..num_records {
+            if let Ok(rec_bytes) = self.read_record(start_record + i as u64) {
+                buf.extend_from_slice(&rec_bytes);
+            } else {
+                buf.resize(buf.len() + self.record_size, 0);
+            }
+        }
+        Ok(buf)
+    }
 }
 
 /// Helper to reconstruct directory hierarchy path from parent references.
@@ -118,7 +148,7 @@ fn build_path(
 
     while let Some(parent_idx) = current_parent {
         if parent_idx == 5 || visited.contains(&parent_idx) {
-            break; // 5 is NTFS root directory
+            break;
         }
         visited.insert(parent_idx);
 
@@ -136,7 +166,20 @@ fn build_path(
     parts.join("/")
 }
 
-/// Scan NTFS volume or image file for deleted file candidates.
+struct RawCandidate {
+    rec_idx: u64,
+    sequence_number: u16,
+    name: String,
+    parent_ref: Option<u64>,
+    data_size: u64,
+    is_resident: bool,
+    resident_bytes: Option<Vec<u8>>,
+    data_runs: Vec<DataRun>,
+    is_directory: bool,
+    timestamps: FileTimestamps,
+}
+
+/// Scan NTFS volume or image file for deleted file candidates in a single high-speed pass.
 pub fn quick_scan_ntfs(
     device: &dyn StorageDevice,
     options: ScanOptions,
@@ -153,16 +196,39 @@ pub fn quick_scan_ntfs(
         _ => total_mft_records,
     };
 
-    info!("Pass 1: Indexing directory structure...");
-    let mut dir_map: HashMap<u64, (String, u64)> = HashMap::new();
+    info!("Starting high-speed single-pass MFT scan over {} records...", max_recs);
 
-    for rec_idx in 0..max_recs {
-        let record_bytes = match mft_reader.read_record(rec_idx) {
-            Ok(bytes) if bytes.len() == boot_sector.mft_record_size as usize => bytes,
-            _ => continue,
+    let mut dir_map: HashMap<u64, (String, u64)> = HashMap::new();
+    let mut raw_candidates: Vec<RawCandidate> = Vec::new();
+
+    let chunk_size_records = 256;
+    let record_size = boot_sector.mft_record_size as usize;
+
+    let mut curr_rec: u64 = 0;
+    while curr_rec < max_recs {
+        let count = ((max_recs - curr_rec) as usize).min(chunk_size_records);
+        let chunk_bytes = match mft_reader.read_records_chunk(curr_rec, count) {
+            Ok(bytes) if bytes.len() == count * record_size => bytes,
+            _ => {
+                curr_rec += count as u64;
+                continue;
+            }
         };
 
-        if let Ok(record) = MftRecord::parse(record_bytes, rec_idx) {
+        for i in 0..count {
+            let rec_idx = curr_rec + i as u64;
+            let offset = i * record_size;
+            let rec_bytes = &chunk_bytes[offset..offset + record_size];
+
+            if &rec_bytes[0..4] != b"FILE" {
+                continue;
+            }
+
+            let record = match MftRecord::parse(rec_bytes.to_vec(), rec_idx) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
             if record.is_directory {
                 for attr in &record.attributes {
                     if let ParsedAttribute::FileName(fn_attr) = attr {
@@ -173,139 +239,145 @@ pub fn quick_scan_ntfs(
                     }
                 }
             }
-        }
-    }
 
-    info!("Pass 2: Scanning deleted candidates...");
-    let mut candidates = Vec::new();
-
-    for rec_idx in 0..max_recs {
-        let record_bytes = match mft_reader.read_record(rec_idx) {
-            Ok(bytes) if bytes.len() == boot_sector.mft_record_size as usize => bytes,
-            _ => continue,
-        };
-
-        let record = match MftRecord::parse(record_bytes, rec_idx) {
-            Ok(rec) => rec,
-            Err(_) => continue,
-        };
-
-        if !record.in_use {
-            if record.is_directory && !options.include_directories {
-                continue;
-            }
-
-            let mut file_name = None;
-            let mut parent_ref = None;
-            let mut fn_timestamps = None;
-            let mut si_timestamps = None;
-            let mut data_size = 0u64;
-            let mut is_resident = false;
-            let mut resident_bytes = None;
-            let mut data_runs = Vec::new();
-
-            for attr in &record.attributes {
-                match attr {
-                    ParsedAttribute::FileName(fn_attr) => {
-                        if file_name.is_none() || fn_attr.namespace != 2 {
-                            file_name = Some(fn_attr.name.clone());
-                            parent_ref = Some(fn_attr.parent_mft_ref);
-                            fn_timestamps = Some(FileTimestamps {
-                                created: fn_attr.creation_time,
-                                modified: fn_attr.modification_time,
-                                mft_modified: fn_attr.mft_modification_time,
-                                accessed: fn_attr.access_time,
-                            });
-                        }
-                    }
-                    ParsedAttribute::StandardInformation(si_attr) => {
-                        si_timestamps = Some(FileTimestamps {
-                            created: si_attr.creation_time,
-                            modified: si_attr.modification_time,
-                            mft_modified: si_attr.mft_modification_time,
-                            accessed: si_attr.access_time,
-                        });
-                    }
-                    ParsedAttribute::Data(data_attr) => {
-                        if data_attr.name.is_none() {
-                            data_size = data_attr.size;
-                            is_resident = !data_attr.is_non_resident;
-                            resident_bytes = data_attr.resident_data.clone();
-                            data_runs = data_attr
-                                .data_runs
-                                .iter()
-                                .map(|r| DataRun {
-                                    cluster_offset: r.lcn,
-                                    cluster_count: r.cluster_count,
-                                })
-                                .collect();
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            if let Some(name) = file_name {
-                if name.starts_with('$') && rec_idx < 16 {
+            if !record.in_use {
+                if record.is_directory && !options.include_directories {
                     continue;
                 }
 
-                let path = build_path(parent_ref, &name, &dir_map);
+                let mut file_name = None;
+                let mut parent_ref = None;
+                let mut fn_timestamps = None;
+                let mut si_timestamps = None;
+                let mut data_size = 0u64;
+                let mut is_resident = false;
+                let mut resident_bytes = None;
+                let mut data_runs = Vec::new();
 
-                let ext = std::path::Path::new(&name)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("")
-                    .to_lowercase();
+                for attr in &record.attributes {
+                    match attr {
+                        ParsedAttribute::FileName(fn_attr) => {
+                            if file_name.is_none() || fn_attr.namespace != 2 {
+                                file_name = Some(fn_attr.name.clone());
+                                parent_ref = Some(fn_attr.parent_mft_ref);
+                                fn_timestamps = Some(FileTimestamps {
+                                    created: fn_attr.creation_time,
+                                    modified: fn_attr.modification_time,
+                                    mft_modified: fn_attr.mft_modification_time,
+                                    accessed: fn_attr.access_time,
+                                });
+                            }
+                        }
+                        ParsedAttribute::StandardInformation(si_attr) => {
+                            si_timestamps = Some(FileTimestamps {
+                                created: si_attr.creation_time,
+                                modified: si_attr.modification_time,
+                                mft_modified: si_attr.mft_modification_time,
+                                accessed: si_attr.access_time,
+                            });
+                        }
+                        ParsedAttribute::Data(data_attr) => {
+                            if data_attr.name.is_none() {
+                                data_size = data_attr.size;
+                                is_resident = !data_attr.is_non_resident;
+                                resident_bytes = data_attr.resident_data.clone();
+                                data_runs = data_attr
+                                    .data_runs
+                                    .iter()
+                                    .map(|r| DataRun {
+                                        cluster_offset: r.lcn,
+                                        cluster_count: r.cluster_count,
+                                    })
+                                    .collect();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
 
-                let timestamps = fn_timestamps.or(si_timestamps).unwrap_or(FileTimestamps {
-                    created: None,
-                    modified: None,
-                    mft_modified: None,
-                    accessed: None,
-                });
+                if let Some(name) = file_name {
+                    if name.starts_with('$') && rec_idx < 16 {
+                        continue;
+                    }
 
-                let confidence = calculate_confidence(
-                    false,
-                    is_resident,
-                    !name.is_empty(),
-                    data_size,
-                    !data_runs.is_empty(),
-                );
+                    let timestamps = fn_timestamps.or(si_timestamps).unwrap_or(FileTimestamps {
+                        created: None,
+                        modified: None,
+                        mft_modified: None,
+                        accessed: None,
+                    });
 
-                let id = format!("rec_{}_{}", rec_idx, record.sequence_number);
-
-                candidates.push(CandidateFile {
-                    id,
-                    mft_record_index: rec_idx,
-                    sequence_number: record.sequence_number,
-                    name,
-                    path,
-                    extension: ext,
-                    parent_mft_reference: parent_ref,
-                    size_bytes: data_size,
-                    allocated_size_bytes: data_size,
-                    is_directory: record.is_directory,
-                    timestamps,
-                    kind: CandidateKind::Metadata,
-                    confidence,
-                    is_resident,
-                    resident_data: resident_bytes,
-                    data_runs,
-                });
+                    raw_candidates.push(RawCandidate {
+                        rec_idx,
+                        sequence_number: record.sequence_number,
+                        name,
+                        parent_ref,
+                        data_size,
+                        is_resident,
+                        resident_bytes,
+                        data_runs,
+                        is_directory: record.is_directory,
+                        timestamps,
+                    });
+                }
             }
         }
 
-        if rec_idx % 10000 == 0 || rec_idx == max_recs - 1 {
+        curr_rec += count as u64;
+
+        // Frequent progress callback every 2,500 records for smooth live UI animation
+        if curr_rec % 2500 == 0 || curr_rec == max_recs {
             progress_cb(ScanProgress {
-                records_scanned: rec_idx + 1,
-                candidates_found: candidates.len() as u64,
+                records_scanned: curr_rec,
+                candidates_found: raw_candidates.len() as u64,
                 total_records: max_recs,
-                is_complete: rec_idx == max_recs - 1,
-                current_status: format!("Scanned MFT record {}/{}", rec_idx + 1, max_recs),
+                is_complete: curr_rec == max_recs,
+                current_status: format!("Scanned MFT record {}/{}", curr_rec, max_recs),
             });
         }
     }
+
+    let candidates = raw_candidates
+        .into_iter()
+        .map(|raw| {
+            let path = build_path(raw.parent_ref, &raw.name, &dir_map);
+
+            let ext = std::path::Path::new(&raw.name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            let confidence = calculate_confidence(
+                false,
+                raw.is_resident,
+                !raw.name.is_empty(),
+                raw.data_size,
+                !raw.data_runs.is_empty(),
+            );
+
+            let id = format!("rec_{}_{}", raw.rec_idx, raw.sequence_number);
+
+            CandidateFile {
+                id,
+                mft_record_index: raw.rec_idx,
+                sequence_number: raw.sequence_number,
+                name: raw.name,
+                path,
+                extension: ext,
+                parent_mft_reference: raw.parent_ref,
+                size_bytes: raw.data_size,
+                allocated_size_bytes: raw.data_size,
+                is_directory: raw.is_directory,
+                timestamps: raw.timestamps,
+                kind: CandidateKind::Metadata,
+                confidence,
+                is_resident: raw.is_resident,
+                resident_data: raw.resident_bytes,
+                data_runs: raw.data_runs,
+            }
+        })
+        .collect();
 
     Ok((boot_sector, candidates))
 }

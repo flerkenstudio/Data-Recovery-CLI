@@ -1,7 +1,34 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use recovery_core::{list_drives, RecoverySession};
+use std::io::Write;
 use std::path::PathBuf;
+
+static SPINNER_ASCII: &[char] = &['|', '/', '-', '\\'];
+
+fn render_live_progress(
+    records_scanned: u64,
+    total_records: u64,
+    candidates_found: u64,
+    is_complete: bool,
+) {
+    if total_records == 0 {
+        return;
+    }
+
+    let spinner = SPINNER_ASCII[(records_scanned / 2500) as usize % SPINNER_ASCII.len()];
+    let percentage = (records_scanned as f64 / total_records as f64 * 100.0).min(100.0) as u32;
+
+    print!(
+        "\r[{}] Scanned {:>7} / {:>7} MFT records ({:>3}%) | Found {:>4} deleted candidate file(s)...",
+        spinner, records_scanned, total_records, percentage, candidates_found
+    );
+    let _ = std::io::stdout().flush();
+
+    if is_complete {
+        println!();
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "recover-cli")]
@@ -91,13 +118,15 @@ fn main() -> Result<()> {
             let mut session = RecoverySession::open(&target)?;
 
             let limit = if max_records == 0 { None } else { Some(max_records) };
-            println!("Scanning MFT records (scanning volume)...");
+            println!("Scanning MFT records...");
 
             let candidates = session.scan(limit, |progress| {
-                if !json && (progress.records_scanned % 10000 == 0 || progress.is_complete) {
-                    println!(
-                        "Progress: {} / {} records scanned ({} deleted candidates found)",
-                        progress.records_scanned, progress.total_records, progress.candidates_found
+                if !json {
+                    render_live_progress(
+                        progress.records_scanned,
+                        progress.total_records,
+                        progress.candidates_found,
+                        progress.is_complete,
                     );
                 }
             })?;
@@ -154,10 +183,12 @@ fn main() -> Result<()> {
             let limit = if max_records == 0 { None } else { Some(max_records) };
             println!("Scanning MFT records...");
             let candidates = session.scan(limit, |progress| {
-                if !json && (progress.records_scanned % 20000 == 0 || progress.is_complete) {
-                    println!(
-                        "Progress: {} / {} records scanned ({} deleted candidates found)",
-                        progress.records_scanned, progress.total_records, progress.candidates_found
+                if !json {
+                    render_live_progress(
+                        progress.records_scanned,
+                        progress.total_records,
+                        progress.candidates_found,
+                        progress.is_complete,
                     );
                 }
             })?;
