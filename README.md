@@ -1,4 +1,4 @@
-# 💽 Windows Data Recovery Suite
+# 💽 Data-Recovery_CLI
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)
 ![Language](https://img.shields.io/badge/language-Rust%20%7C%20TypeScript-orange?style=flat-square)
