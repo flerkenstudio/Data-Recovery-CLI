@@ -1,0 +1,12 @@
+[package]
+name = "reconstruction"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+storage = { path = "../storage" }
+ntfs-parser = { path = "../ntfs-parser" }
+filesystem = { path = "../filesystem" }

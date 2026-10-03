@@ -1,0 +1,25 @@
+{
+  "bytes_per_cluster": 4096,
+  "mft_lcn": 4,
+  "record_size": 1024,
+  "files": [
+    {
+      "record": 7,
+      "name": "notes.txt",
+      "path": "Documents/notes.txt",
+      "deleted": true,
+      "sha256": "5cc4c63a20381f976b4a8f4a2ccde008dfa1245feedb1f3365c2886a2a48e29f",
+      "size": 28,
+      "kind": "resident"
+    },
+    {
+      "record": 8,
+      "name": "payload.bin",
+      "path": "payload.bin",
+      "deleted": true,
+      "sha256": "7a846dbc846d1dcc0c90432ae0d71b71804a69451d6882724b1e78189782b50a",
+      "size": 25,
+      "kind": "nonresident"
+    }
+  ]
+}

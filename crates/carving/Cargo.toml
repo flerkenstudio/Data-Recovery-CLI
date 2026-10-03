@@ -1,0 +1,12 @@
+[package]
+name = "carving"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+signatures = { path = "../signatures" }
+storage = { path = "../storage" }
+filesystem = { path = "../filesystem" }

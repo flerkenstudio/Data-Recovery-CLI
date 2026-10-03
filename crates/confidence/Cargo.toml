@@ -1,0 +1,9 @@
+[package]
+name = "confidence"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+tracing.workspace = true
+filesystem = { path = "../filesystem" }

@@ -1,0 +1,17 @@
+[package]
+name = "recover-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "recover-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap = { workspace = true }
+recovery-core = { path = "../recovery-core" }
+storage = { path = "../storage" }
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

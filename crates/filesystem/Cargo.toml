@@ -1,0 +1,12 @@
+[package]
+name = "filesystem"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+ntfs-parser = { path = "../ntfs-parser" }
+storage = { path = "../storage" }

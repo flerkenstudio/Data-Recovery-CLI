@@ -1,0 +1,17 @@
+[package]
+name = "scanner"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+storage = { path = "../storage" }
+ntfs-parser = { path = "../ntfs-parser" }
+filesystem = { path = "../filesystem" }
+confidence = { path = "../confidence" }
+signatures = { path = "../signatures" }
+getrandom = { workspace = true }
