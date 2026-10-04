@@ -23,7 +23,9 @@ pub fn calculate_confidence(
     }
 
     if is_resident {
-        reasons.push("Data is resident inside MFT record (100% recoverable if MFT intact)".to_string());
+        reasons.push(
+            "Data is resident inside MFT record (100% recoverable if MFT intact)".to_string(),
+        );
     } else {
         if !has_data_runs && data_size > 0 {
             score = score.saturating_sub(60);

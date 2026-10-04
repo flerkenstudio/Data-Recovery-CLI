@@ -72,7 +72,10 @@ impl FileStorageDevice {
         let file = File::open(&path)?;
         let metadata = file.metadata()?;
         let size = metadata.len();
-        info!("Opened file storage device {:?} (size: {} bytes)", path, size);
+        info!(
+            "Opened file storage device {:?} (size: {} bytes)",
+            path, size
+        );
         Ok(Self { path, size })
     }
 }
@@ -125,10 +128,13 @@ impl WinStorageDevice {
         use windows::Win32::Storage::FileSystem::{
             CreateFileW, GetFileSizeEx, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
         };
-        use windows::Win32::System::IO::DeviceIoControl;
         use windows::Win32::System::Ioctl::IOCTL_DISK_GET_LENGTH_INFO;
+        use windows::Win32::System::IO::DeviceIoControl;
 
-        let wide_path: Vec<u16> = device_path.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_path: Vec<u16> = device_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
 
         let handle = unsafe {
             CreateFileW(
@@ -180,7 +186,10 @@ impl WinStorageDevice {
             }
         };
 
-        info!("Opened Windows volume {} (detected size: {} bytes)", device_path, size);
+        info!(
+            "Opened Windows volume {} (detected size: {} bytes)",
+            device_path, size
+        );
 
         Ok(Self {
             handle,
@@ -225,13 +234,8 @@ impl StorageDevice for WinStorageDevice {
 
         let mut bytes_read: u32 = 0;
         unsafe {
-            ReadFile(
-                self.handle,
-                Some(buf),
-                Some(&mut bytes_read),
-                None,
-            )
-            .map_err(|e| StorageError::Io(std::io::Error::from_raw_os_error(e.code().0)))?;
+            ReadFile(self.handle, Some(buf), Some(&mut bytes_read), None)
+                .map_err(|e| StorageError::Io(std::io::Error::from_raw_os_error(e.code().0)))?;
         }
 
         Ok(bytes_read as usize)

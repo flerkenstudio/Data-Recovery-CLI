@@ -87,7 +87,8 @@ impl<'a> MftReader<'a> {
         for run in &self.runs {
             let run_len_bytes = run.cluster_count * self.bytes_per_cluster as u64;
             if record_offset_in_mft >= current_mft_offset
-                && record_offset_in_mft + self.record_size as u64 <= current_mft_offset + run_len_bytes
+                && record_offset_in_mft + self.record_size as u64
+                    <= current_mft_offset + run_len_bytes
             {
                 let offset_in_run = record_offset_in_mft - current_mft_offset;
                 let disk_offset = (run.lcn * self.bytes_per_cluster as u64) + offset_in_run;
@@ -196,7 +197,10 @@ pub fn quick_scan_ntfs(
         _ => total_mft_records,
     };
 
-    info!("Starting high-speed single-pass MFT scan over {} records...", max_recs);
+    info!(
+        "Starting high-speed single-pass MFT scan over {} records...",
+        max_recs
+    );
 
     let mut dir_map: HashMap<u64, (String, u64)> = HashMap::new();
     let mut raw_candidates: Vec<RawCandidate> = Vec::new();

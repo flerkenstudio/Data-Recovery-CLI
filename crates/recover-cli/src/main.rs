@@ -96,7 +96,10 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::ListDrives => {
             let drives = list_drives().context("Failed to list system drives")?;
-            println!("{:<15} {:<15} {:<15} {}", "DEVICE PATH", "DISPLAY NAME", "FILESYSTEM", "MOUNT POINT");
+            println!(
+                "{:<15} {:<15} {:<15} {}",
+                "DEVICE PATH", "DISPLAY NAME", "FILESYSTEM", "MOUNT POINT"
+            );
             println!("{}", "-".repeat(65));
             for d in drives {
                 println!(
@@ -117,7 +120,11 @@ fn main() -> Result<()> {
             println!("Opening device/image: {target}...");
             let mut session = RecoverySession::open(&target)?;
 
-            let limit = if max_records == 0 { None } else { Some(max_records) };
+            let limit = if max_records == 0 {
+                None
+            } else {
+                Some(max_records)
+            };
             println!("Scanning MFT records...");
 
             let candidates = session.scan(limit, |progress| {
@@ -150,7 +157,10 @@ fn main() -> Result<()> {
                 let json_output = serde_json::to_string_pretty(&filtered_candidates)?;
                 println!("{json_output}");
             } else {
-                println!("\nFound {} deleted candidate file(s):", filtered_candidates.len());
+                println!(
+                    "\nFound {} deleted candidate file(s):",
+                    filtered_candidates.len()
+                );
                 println!(
                     "{:<18} {:<25} {:<35} {:<12} {:<12}",
                     "ID", "NAME", "PATH", "SIZE (BYTES)", "CONFIDENCE"
@@ -180,7 +190,11 @@ fn main() -> Result<()> {
             println!("Opening device/image: {target}...");
             let mut session = RecoverySession::open(&target)?;
 
-            let limit = if max_records == 0 { None } else { Some(max_records) };
+            let limit = if max_records == 0 {
+                None
+            } else {
+                Some(max_records)
+            };
             println!("Scanning MFT records...");
             let candidates = session.scan(limit, |progress| {
                 if !json {
@@ -215,17 +229,29 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("Recovering {} candidate file(s) to {:?}...", target_ids.len(), output);
+            println!(
+                "Recovering {} candidate file(s) to {:?}...",
+                target_ids.len(),
+                output
+            );
             let report = session.recover_candidates(&target_ids, &output, |progress| {
                 if !json {
-                    let spinner = SPINNER_ASCII[(progress.files_processed / 10) % SPINNER_ASCII.len()];
-                    let percentage = (progress.files_processed as f64 / progress.total_files as f64 * 100.0).min(100.0) as u32;
+                    let spinner =
+                        SPINNER_ASCII[(progress.files_processed / 10) % SPINNER_ASCII.len()];
+                    let percentage = (progress.files_processed as f64 / progress.total_files as f64
+                        * 100.0)
+                        .min(100.0) as u32;
                     print!(
                         "\r[{}] Recovered {:>7} / {:>7} files ({:>3}%) | Success: {}, Failed: {}",
-                        spinner, progress.files_processed, progress.total_files, percentage, progress.successful, progress.failed
+                        spinner,
+                        progress.files_processed,
+                        progress.total_files,
+                        percentage,
+                        progress.successful,
+                        progress.failed
                     );
                     let _ = std::io::stdout().flush();
-                    
+
                     if progress.files_processed == progress.total_files {
                         println!();
                     }

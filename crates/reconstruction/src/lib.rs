@@ -52,7 +52,7 @@ pub fn reconstruct_bytes(
             let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
             let chunk = device.read_exact_at(run_offset_bytes, read_len_bytes as usize)?;
             let chunk_slice = &chunk[0..actual_len_bytes as usize];
-            
+
             remaining -= chunk_slice.len() as u64;
             file_buf.extend_from_slice(chunk_slice);
         }
@@ -104,7 +104,7 @@ pub fn reconstruct_to_file<P: AsRef<Path>>(
             let run_offset_bytes = run.cluster_offset * bytes_per_cluster as u64;
             let chunk = device.read_exact_at(run_offset_bytes, read_len_bytes as usize)?;
             let chunk_slice = &chunk[0..actual_len_bytes as usize];
-            
+
             out_file.write_all(chunk_slice)?;
             total_written += chunk_slice.len() as u64;
             remaining -= chunk_slice.len() as u64;

@@ -128,7 +128,7 @@ pub fn decode_runlist(runlist_bytes: &[u8]) -> Result<Vec<ParsedDataRun>> {
 
         let mut lcn_delta: i64 = 0;
         let mut is_sparse = false;
-        
+
         if offset_size > 0 {
             for i in 0..offset_size {
                 lcn_delta |= (runlist_bytes[cursor + i] as i64) << (i * 8);
@@ -146,7 +146,11 @@ pub fn decode_runlist(runlist_bytes: &[u8]) -> Result<Vec<ParsedDataRun>> {
         }
 
         runs.push(ParsedDataRun {
-            lcn: if is_sparse { u64::MAX } else { current_lcn as u64 },
+            lcn: if is_sparse {
+                u64::MAX
+            } else {
+                current_lcn as u64
+            },
             cluster_count: count,
         });
     }
@@ -178,10 +182,7 @@ pub fn apply_usa_fixup(buf: &mut [u8], usa_offset: u16, usa_count: u16) -> Resul
             return Err(NtfsError::FixupFailed);
         }
 
-        let fixup_val = [
-            buf[usa_offset + i * 2],
-            buf[usa_offset + i * 2 + 1],
-        ];
+        let fixup_val = [buf[usa_offset + i * 2], buf[usa_offset + i * 2 + 1]];
 
         buf[sector_end] = fixup_val[0];
         buf[sector_end + 1] = fixup_val[1];
@@ -297,12 +298,14 @@ impl MftRecord {
             match attr_type {
                 0x10 => {
                     if !non_resident && attr_len >= 24 + 48 {
-                        let content_offset = u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
+                        let content_offset =
+                            u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
                         if content_offset + 48 <= attr_len {
                             let c_bytes = &attr_bytes[content_offset..];
                             let create_ft = u64::from_le_bytes(c_bytes[0..8].try_into().unwrap());
                             let mod_ft = u64::from_le_bytes(c_bytes[8..16].try_into().unwrap());
-                            let mft_mod_ft = u64::from_le_bytes(c_bytes[16..24].try_into().unwrap());
+                            let mft_mod_ft =
+                                u64::from_le_bytes(c_bytes[16..24].try_into().unwrap());
                             let acc_ft = u64::from_le_bytes(c_bytes[24..32].try_into().unwrap());
                             let dos_perm = u32::from_le_bytes(c_bytes[32..36].try_into().unwrap());
 
@@ -320,13 +323,16 @@ impl MftRecord {
                 }
                 0x30 => {
                     if !non_resident && attr_bytes.len() >= 24 {
-                        let content_offset = u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
+                        let content_offset =
+                            u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
                         if content_offset + 66 <= attr_bytes.len() {
                             let c_bytes = &attr_bytes[content_offset..];
-                            let parent_ref = u64::from_le_bytes(c_bytes[0..8].try_into().unwrap()) & 0x0000FFFFFFFFFFFF;
+                            let parent_ref = u64::from_le_bytes(c_bytes[0..8].try_into().unwrap())
+                                & 0x0000FFFFFFFFFFFF;
                             let create_ft = u64::from_le_bytes(c_bytes[8..16].try_into().unwrap());
                             let mod_ft = u64::from_le_bytes(c_bytes[16..24].try_into().unwrap());
-                            let mft_mod_ft = u64::from_le_bytes(c_bytes[24..32].try_into().unwrap());
+                            let mft_mod_ft =
+                                u64::from_le_bytes(c_bytes[24..32].try_into().unwrap());
                             let acc_ft = u64::from_le_bytes(c_bytes[32..40].try_into().unwrap());
                             let alloc_sz = u64::from_le_bytes(c_bytes[40..48].try_into().unwrap());
                             let real_sz = u64::from_le_bytes(c_bytes[48..56].try_into().unwrap());
@@ -371,8 +377,10 @@ impl MftRecord {
                     };
 
                     if non_resident {
-                        let runlist_off = u16::from_le_bytes([attr_bytes[32], attr_bytes[33]]) as usize;
-                        let real_size = u64::from_le_bytes(attr_bytes[48..56].try_into().unwrap_or([0; 8]));
+                        let runlist_off =
+                            u16::from_le_bytes([attr_bytes[32], attr_bytes[33]]) as usize;
+                        let real_size =
+                            u64::from_le_bytes(attr_bytes[48..56].try_into().unwrap_or([0; 8]));
                         let runs = if runlist_off < attr_bytes.len() {
                             decode_runlist(&attr_bytes[runlist_off..]).unwrap_or_default()
                         } else {
@@ -387,8 +395,14 @@ impl MftRecord {
                             data_runs: runs,
                         }));
                     } else {
-                        let content_off = u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
-                        let content_len = u32::from_le_bytes([attr_bytes[16], attr_bytes[17], attr_bytes[18], attr_bytes[19]]) as usize;
+                        let content_off =
+                            u16::from_le_bytes([attr_bytes[20], attr_bytes[21]]) as usize;
+                        let content_len = u32::from_le_bytes([
+                            attr_bytes[16],
+                            attr_bytes[17],
+                            attr_bytes[18],
+                            attr_bytes[19],
+                        ]) as usize;
 
                         let payload = if content_off + content_len <= attr_bytes.len() {
                             Some(attr_bytes[content_off..content_off + content_len].to_vec())

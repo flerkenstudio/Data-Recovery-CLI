@@ -1,11 +1,13 @@
 use filesystem::{
-    CandidateFile, RecoveryReport, SingleFileRecoveryOutcome, ScanProgress, RecoveryProgress
+    CandidateFile, RecoveryProgress, RecoveryReport, ScanProgress, SingleFileRecoveryOutcome,
 };
 use ntfs_parser::BootSector;
 use reconstruction::reconstruct_to_file;
 use scanner::{quick_scan_ntfs, ScanOptions};
 use std::path::Path;
-use storage::{list_drives as storage_list_drives, open_storage_device, DriveDetails, StorageDevice};
+use storage::{
+    list_drives as storage_list_drives, open_storage_device, DriveDetails, StorageDevice,
+};
 use thiserror::Error;
 use validation::compute_sha256_file;
 
@@ -84,10 +86,9 @@ impl RecoverySession {
         let dest_dir = destination_dir.as_ref();
         std::fs::create_dir_all(dest_dir)?;
 
-        let boot_sector = self
-            .boot_sector
-            .as_ref()
-            .ok_or_else(|| RecoveryCoreError::SessionError("Scan must be performed before recovery".to_string()))?;
+        let boot_sector = self.boot_sector.as_ref().ok_or_else(|| {
+            RecoveryCoreError::SessionError("Scan must be performed before recovery".to_string())
+        })?;
 
         let bytes_per_cluster = boot_sector.bytes_per_cluster;
         let mut outcomes = Vec::new();
@@ -114,7 +115,12 @@ impl RecoverySession {
 
             let target_file_path = dest_dir.join(&candidate.name);
 
-            match reconstruct_to_file(candidate, &*self.storage_device, bytes_per_cluster, &target_file_path) {
+            match reconstruct_to_file(
+                candidate,
+                &*self.storage_device,
+                bytes_per_cluster,
+                &target_file_path,
+            ) {
                 Ok(bytes_written) => {
                     let hash = compute_sha256_file(&target_file_path).ok();
                     successful += 1;
