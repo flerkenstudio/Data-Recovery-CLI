@@ -123,6 +123,16 @@ On the synthetic NTFS test image (`tests/fixtures/synthetic_ntfs.img`), exact SH
 - `notes.txt` (resident deleted file)
 - `payload.bin` (non-resident data runs)
 
+### Testing on Live Drives & SSD TRIM Limitations
+When testing the recovery tool on a live, physical Windows drive, be aware of the following:
+
+**1. The "Active C: Drive" Overwrite Limitation:**
+If you delete a file on your primary system drive (`C:`), Windows background processes (telemetry, indexing, logging) will instantly reuse the freed clusters. This destroys the file's MFT record and overwrites the physical data. **Always test on a secondary drive (e.g., `D:`) or a USB flash drive.**
+
+**2. Modern SSD Hardware TRIM (DZAT):**
+When a file is deleted on a modern Solid State Drive (NVMe or SATA), Windows immediately issues a **TRIM** hardware command to the SSD controller. The controller unmaps the physical flash blocks. If a data recovery tool reads the raw LCNs of those blocks, the SSD controller intercepts the request and guarantees a response of **100% zeroes** (Deterministic Read Zero after TRIM). 
+*Note: Because of TRIM, deleted files on modern SSDs are permanently destroyed in milliseconds. The tool will successfully find the deleted MFT records and rebuild the file paths, but the extracted files will contain only zeroes. To test actual data extraction, use an HDD, a USB drive, or an SSD with TRIM explicitly disabled.*
+
 ## 📈 Development Status
 
 Current milestone focus: **Phase 1 — NTFS Read-Only Scanner + Recovery vertical slice**.

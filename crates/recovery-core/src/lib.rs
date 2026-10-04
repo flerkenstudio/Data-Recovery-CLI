@@ -65,7 +65,7 @@ impl RecoverySession {
     ) -> Result<&[CandidateFile]> {
         let options = ScanOptions {
             max_records,
-            include_directories: false,
+            include_directories: true,
         };
 
         let (boot_sector, candidates) =
