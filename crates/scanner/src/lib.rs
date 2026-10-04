@@ -243,10 +243,10 @@ pub fn quick_scan_ntfs(
                             is_directory = true;
                         }
                     }
-                    ParsedAttribute::FileName(fn_attr) => {
-                        if best_name.is_none() || fn_attr.namespace != 2 {
-                            best_name = Some((fn_attr.name.clone(), fn_attr.parent_mft_ref));
-                        }
+                    ParsedAttribute::FileName(fn_attr)
+                        if (best_name.is_none() || fn_attr.namespace != 2) =>
+                    {
+                        best_name = Some((fn_attr.name.clone(), fn_attr.parent_mft_ref));
                     }
                     _ => {}
                 }
@@ -294,20 +294,18 @@ pub fn quick_scan_ntfs(
                                 accessed: si_attr.access_time,
                             });
                         }
-                        ParsedAttribute::Data(data_attr) => {
-                            if data_attr.name.is_none() {
-                                data_size = data_attr.size;
-                                is_resident = !data_attr.is_non_resident;
-                                resident_bytes = data_attr.resident_data.clone();
-                                data_runs = data_attr
-                                    .data_runs
-                                    .iter()
-                                    .map(|r| DataRun {
-                                        cluster_offset: r.lcn,
-                                        cluster_count: r.cluster_count,
-                                    })
-                                    .collect();
-                            }
+                        ParsedAttribute::Data(data_attr) if data_attr.name.is_none() => {
+                            data_size = data_attr.size;
+                            is_resident = !data_attr.is_non_resident;
+                            resident_bytes = data_attr.resident_data.clone();
+                            data_runs = data_attr
+                                .data_runs
+                                .iter()
+                                .map(|r| DataRun {
+                                    cluster_offset: r.lcn,
+                                    cluster_count: r.cluster_count,
+                                })
+                                .collect();
                         }
                         _ => {}
                     }
@@ -344,7 +342,7 @@ pub fn quick_scan_ntfs(
         curr_rec += count as u64;
 
         // Frequent progress callback every 2,500 records for smooth live UI animation
-        if curr_rec % 2500 == 0 || curr_rec == max_recs {
+        if curr_rec.is_multiple_of(2500) || curr_rec == max_recs {
             progress_cb(ScanProgress {
                 records_scanned: curr_rec,
                 candidates_found: raw_candidates.len() as u64,
