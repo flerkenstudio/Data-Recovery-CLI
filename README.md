@@ -139,6 +139,27 @@ To successfully test the tool on your physical machine without interference from
    ```
    *Note: Ensure your `--output` folder is on a different drive than your test drive!*
 
+**Sample Test Result:**
+```text
+D:\TESting\testing\windows-data-recovery>target\release\recover-cli.exe recover \\.\D: --output C:\RecoveredData --filter "flerken_test"
+Opening device/image: \\.\D:...
+Scanning MFT records...
+[|] Scanned 1600512 / 1600512 MFT records (100%) | Found 899753 deleted candidate file(s)...
+Recovering 3 candidate file(s) to "C:\\RecoveredData"...
+[|] Recovered       3 /       3 files (100%) | Success: 3, Failed: 0
+
+--- Recovery Summary ---
+Total requested : 3
+Successful      : 3
+Failed          : 0
+Destination     : C:\RecoveredData
+
+Details:
+  [OK] flerkenstudio (0 bytes) -> SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  [OK] Honey Mesh Vishwakarma.pdf (85040 bytes) -> SHA-256: b35bc96922454fbba532703f48b3b5cbe1a6ae12b4f7304e853e60a89c43d93c
+  [OK] HTU8eCGWMAADqQ6.jpg (1102096 bytes) -> SHA-256: 18168fd5528405934656b653c63ea056f77fc14d292b34988094238ba9adf23c
+```
+
 ### Testing on Live Drives & SSD TRIM Limitations
 When testing the recovery tool on a live, physical Windows drive, be aware of the following:
 
