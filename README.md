@@ -90,15 +90,19 @@ npm run tauri build
 ## 💻 Usage Guide
 
 ### Command Line Interface (CLI)
-You can run the recovery engine directly from the CLI. This is especially useful for testing, debugging, and scripting.
+You can run the recovery engine directly from the CLI. Raw disk access requires administrator privileges.
 
-```bash
-# Scan a disk image or physical drive
-cargo run -p recover-cli -- scan tests/fixtures/synthetic_ntfs.img --max-records 16
-
-# Recover files to an output directory
-cargo run -p recover-cli -- recover tests/fixtures/synthetic_ntfs.img --output /tmp/out --max-records 16
-```
+**To run the tool and recover your files, follow these steps:**
+1. Open **Windows PowerShell** as Administrator.
+2. Navigate to the project directory: `cd /d D:\TESting\testing\windows-data-recovery`
+3. Run the recovery command (replace `\\.\D:` and `C:\RecoveredData` with your source and destination):
+   ```powershell
+   # Recover specific files using a filter
+   target\release\recover-cli.exe recover \\.\D: --output C:\RecoveredData --filter "flerken"
+   
+   # Or recover EVERYTHING on the drive (use with caution)
+   target\release\recover-cli.exe recover \\.\D: --output C:\RecoveredData
+   ```
 
 ### Desktop UI
 To run the graphical interface in development mode with hot-reloading:
@@ -122,6 +126,18 @@ cargo test --workspace
 On the synthetic NTFS test image (`tests/fixtures/synthetic_ntfs.img`), exact SHA-256 recovery is currently verified for:
 - `notes.txt` (resident deleted file)
 - `payload.bin` (non-resident data runs)
+
+### How to see the tool work perfectly (Live Testing)
+To successfully test the tool on your physical machine without interference from Windows or SSD hardware features, follow these steps:
+1. Use a **USB Flash Drive** or a non-system **Hard Disk Drive (HDD)**. *(Do not use your `C:` drive, and avoid modern SSDs with TRIM enabled).*
+2. Create a test folder (e.g., `flerkenstudio`) on the drive.
+3. Place a sample file (e.g., a PDF or JPG) inside the folder.
+4. Permanently delete the folder (using `Shift + Delete`).
+5. Run the CLI recovery command immediately:
+   ```powershell
+   target\release\recover-cli.exe recover \\.\D: --output C:\RecoveredData --filter "flerkenstudio"
+   ```
+   *Note: Ensure your `--output` folder is on a different drive than your test drive!*
 
 ### Testing on Live Drives & SSD TRIM Limitations
 When testing the recovery tool on a live, physical Windows drive, be aware of the following:
